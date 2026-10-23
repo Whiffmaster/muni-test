@@ -1,0 +1,13 @@
+
+node_modules
+dist
+.cache
+.env
+
+# the database of a local run
+data/app.db
+data/app.db-shm
+data/app.db-wal
+
+# the backups of a local run
+backups

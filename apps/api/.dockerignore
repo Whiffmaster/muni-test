@@ -1,0 +1,15 @@
+# The files that are not needed for the build of the API image.
+
+node_modules
+dist
+.cache
+coverage
+
+.env
+.env.*
+!.env.example
+
+*.log
+.vscode
+.idea
+.DS_Store

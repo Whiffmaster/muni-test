@@ -1,0 +1,37 @@
+# The files that are not needed for the build of the images.
+#
+# The build context is the whole workspace, so everything that is not needed
+# is left out - it makes the build faster and keeps the secrets out.
+
+# the dependencies
+node_modules
+**/node_modules
+
+# the builds
+dist
+**/dist
+.cache
+**/.cache
+
+# the data of a local run
+data/app.db
+data/app.db-shm
+data/app.db-wal
+backups
+**/backups
+
+# the secrets
+.env
+.env.*
+!.env.example
+
+# the tests and the reports
+coverage
+**/coverage
+*.log
+
+# the tools
+.vscode
+.idea
+.DS_Store
+*.swp

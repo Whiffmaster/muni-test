@@ -1,0 +1,123 @@
+# The panel of the training records.
+#
+# Three containers:
+#
+#   api     - the API with the database. It is not published - only the web
+#             container can talk to it.
+#   web     - nginx with the built panel. It passes /api to the API and is
+#             the only thing that is open to the internet.
+#   backup  - takes a backup of the database every hour.
+#
+# The database is a single SQLite file in the volume "db", so the data
+# survives a restart of the containers. The backups go into the volume
+# "backups".
+#
+# The passwords are read from the file ".env" next to this one:
+#
+#   PANEL_PASSWORD  the password of the gate
+#   PANEL_SECRET    the key the sessions are signed with
+#   WEB_ORIGIN      the address of the panel, e.g. https://panel.example.cz
+#
+# Start it with:
+#
+#   docker compose up -d --build
+
+name: muni-test
+
+x-api-build: &api-build
+  context: .
+  dockerfile: apps/api/Dockerfile
+
+x-api-image: &api-image muni-api:latest
+
+services:
+  # ---------------------------------------------------------------- #
+  # the API with the database                                          #
+  # ---------------------------------------------------------------- #
+  api:
+    build: *api-build
+    image: *api-image
+    container_name: muni-api
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # the database - a single file in the volume "db"
+      DB_PATH: /data/app.db
+      # the CSV files, used only when the database is still empty
+      SEED_DIR: /seed
+      # the gate
+      PANEL_PASSWORD: ${PANEL_PASSWORD:?PANEL_PASSWORD has to be set in the .env file}
+      PANEL_SECRET: ${PANEL_SECRET:?PANEL_SECRET has to be set in the .env file}
+      # the address of the panel
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
+      # nginx is in front of the API, so its address has to be believed
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+    volumes:
+      # the database
+      - db:/data
+      # the CSV files, only read
+      - ./data:/seed:ro
+    # the API is not published - it stays inside the docker network
+    expose:
+      - "3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ---------------------------------------------------------------- #
+  # the panel                                                         #
+  # ---------------------------------------------------------------- #
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: muni-web:latest
+    container_name: muni-web
+    ports:
+      # the only port that is open to the internet
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ---------------------------------------------------------------- #
+  # the backup of the database                                        #
+  # ---------------------------------------------------------------- #
+  backup:
+    build: *api-build
+    image: *api-image
+    container_name: muni-backup
+    command: ["node", "apps/api/dist/backup-loop.js"]
+    environment:
+      DB_PATH: /data/app.db
+      BACKUP_DIR: /backups
+      # every hour
+      BACKUP_MINUTES: ${BACKUP_MINUTES:-60}
+      # how many backups are kept (48 hours)
+      BACKUP_KEEP: ${BACKUP_KEEP:-48}
+    volumes:
+      # The volume is mounted read and write, because SQLite needs to write
+      # the shared memory file of the write ahead log - even when it only
+      # reads. The backup itself never writes into the database.
+      - db:/data
+      # the backups
+      - backups:/backups
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db:
+  backups:

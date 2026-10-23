@@ -1,0 +1,20 @@
+{
+  "name": "muni-test",
+  "version": "1.0.0",
+  "private":true,
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.3.0",
+      "onFail": "download"
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
